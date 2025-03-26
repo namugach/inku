@@ -19,9 +19,23 @@ const inku = {
     const target = document.getElementById('app');
     const html = await this.fetchAndResolve(`compo/${viewName}.html`);
     target.innerHTML = html;
+  },
+
+  getCurrentRoute() {
+    const hash = location.hash || '#/home';
+    const route = hash.replace(/^#\//, '');
+    return route;
+  },
+
+  async route() {
+    const viewName = this.getCurrentRoute();
+    await this.render(viewName);
+  },
+
+  init() {
+    window.addEventListener('DOMContentLoaded', () => this.route());
+    window.addEventListener('hashchange', () => this.route());
   }
 };
 
-window.addEventListener('DOMContentLoaded', () => {
-  inku.render('home'); // 초기 로딩
-});
+inku.init();

@@ -1,4 +1,5 @@
 # Inku
+![Inku Logo](./static/img/inku.png)
 
 [English 🇺🇸](./README.md) | [한국어 🇰🇷](./README.ko.md)
 
@@ -6,6 +7,19 @@
 designed for building static websites without the need for build tools or frameworks.  
 It supports a component-based structure and hash-based routing,  
 making it highly maintainable and scalable.
+
+
+## What the Inku??
+
+The name **Inku** is inspired by the word `include`.  
+It symbolizes a simple and natural way to "insert" reusable HTML snippets —  
+as if speaking or composing them fluidly into a page.
+
+- `Inku` = include + 口 (the Chinese character for "mouth" or "container")
+- Short, memorable, and easy to use
+- Pairs well with its syntax: `{{ include("...") }}`
+
+> Inku aims to be lightweight yet structurally powerful for static web development.
 
 ---
 

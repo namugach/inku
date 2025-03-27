@@ -1,127 +1,107 @@
 # Inku
+
 ![Inku Logo](./static/img/inku.png)
 
 [English 🇺🇸](./README.md) | [한국어 🇰🇷](./README.ko.md)
 
-**Inku** is a lightweight and intuitive HTML templating system  
-designed for building static websites without the need for build tools or frameworks.  
-It supports a component-based structure and hash-based routing,  
-making it highly maintainable and scalable.
+---
 
-
-## What the Inku??
-
-The name **Inku** is inspired by the word `include`.  
-It symbolizes a simple and natural way to "insert" reusable HTML snippets —  
-as if speaking or composing them fluidly into a page.
-
-- `Inku` = include + 口 (the Chinese character for "mouth" or "container")
-- Short, memorable, and easy to use
-- Pairs well with its syntax: `{{ include("...") }}`
-
-> Inku aims to be lightweight yet structurally powerful for static web development.
+**Inku** is a super-lightweight template system designed to build static websites in a component-based way.  
+Without any build tools or frameworks, you can implement dynamic routing, reusable UI composition, and seamless page transitions using pure HTML/CSS/JS.
 
 ---
 
-## Features
+## ✨ Features
 
-- Use `{{ include("...") }}` syntax to insert HTML components
-- Supports recursive template loading (nested includes)
-- Hash-based routing (e.g., `#/home`, `#/intro`)
-- Maintains the current view even on page refresh
-- Works fully in static environments (HTML + JS + CSS only)
+- Component-based HTML structure using `{{ include("filepath") }}` syntax
+- Hash-based routing system based on files in the `pages/` directory
+- Page-specific CSS is automatically extracted and injected into `<head>` (no duplicates, seamless transition)
+- Flicker-free page transitions
+- Pure JavaScript, works anywhere without installation
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 inku/
-├── index.html                  # Entry point
-├── compo/
-│   ├── home.html               # Home page template
-│   └── intro.html              # Intro page template
-├── parts/
-│   ├── header.html             # Shared header
-│   ├── main.html               # Main content section
-│   └── footer.html             # Shared footer
+├── index.html                # Entry point
 ├── core/
-│   └── core.js                 # Inku template engine
+│   ├── core.js               # Core engine logic
+│   └── init.css              # Reset / base styles
+├── pages/                    # Pages used in routing
+│   ├── home/index.html
+│   └── intro/index.html
+├── parts/                    # Reusable HTML components
+│   ├── header.html
+│   ├── main.html
+│   └── footer.html
 ├── static/
-│   ├── css/style.css           # Stylesheet
-│   ├── img/                    # Image assets
-│   └── script/script.js        # Optional scripts
-└── README.md
+│   ├── css/style.css         # Global CSS
+│   ├── img/inku.png          # Logo image
+│   └── script/script.js      # Optional JS scripts
+├── README.md
+└── README.ko.md
 ```
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
-### 1. Run a local server
+### 1. Run Local Server
 
 ```bash
 python3 -m http.server 5000
 ```
 
-Then open the following URL in your browser:  
-→ `http://localhost:5000/index.html`
+Visit:
+```
+http://localhost:5000/
+```
+
+### 2. Routing Example
+
+- `#/home` → loads `pages/home/index.html`
+- `#/intro` → loads `pages/intro/index.html`
+
+All content is rendered into the `#app` section inside `index.html`.
 
 ---
 
-### 2. Example Template Usage
+## 🪩 Example: Page Template
 
 ```html
-<!-- compo/home.html -->
+<!-- pages/home/index.html -->
 {{ include("parts/header.html") }}
-
-<main>
-  {{ include("parts/main.html") }}
-</main>
-
+{{ include("parts/main.html") }}
 {{ include("parts/footer.html") }}
+<link rel="stylesheet" href="pages/home/style.css">
 ```
 
----
-
-### 3. Navigation (Routing)
-
-```html
-<!-- index.html -->
-<a href="#/home">Home</a>
-<a href="#/intro">Intro</a>
-```
-
-Routing is handled based on the URL hash (`location.hash`).  
-The current view is preserved even after a page refresh.
+CSS is automatically moved to the `<head>`, and applied only after the file is fully loaded.
 
 ---
 
-## API Overview
+## 🔤 Waht the Inku?!
 
-### `inku.fetchAndResolve(path: string): Promise<string>`
+**Inku** is inspired by the word `include`.  
+It means to "speak and insert HTML naturally" as if it's flowing.
 
-Fetches and recursively parses all `include()` statements from the given HTML file.
+- `Inku` = include + 口 (Chinese character for "mouth" / receptacle)
+- Short, memorable, and intuitive to use
+- Syntax example: `{{ include("...") }}`
 
-### `inku.render(viewName: string)`
-
-Loads and renders the specified template from the `compo/` directory.
-
-### `inku.route()`
-
-Parses the current hash (`location.hash`) and renders the appropriate template accordingly.
+> Inku is small and simple, but designed with scalable and structured architecture in mind.
 
 ---
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License.  
-You are free to use, modify, and distribute it.
+MIT License. Free to use, modify, and distribute.
 
 ---
 
-## Authors
+## 👨‍🔧 Authors
+- by **namugach** & **P.Ty**
 
-- Planning & Structure: [namugach]
-- Template Engine Development: [mypt]
-- Objective: **A lightweight, intuitive, and maintainable native HTML templating system**
+

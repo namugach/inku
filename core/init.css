@@ -1,0 +1,6 @@
+#app {
+  display: none;
+}
+#app.visible {
+  display: block;
+}

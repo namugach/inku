@@ -93,6 +93,9 @@ class InkuStyle {
 
   /** 이전 페이지 스타일 제거 */
   removePrePage() {
+    if(this.prePag?.styleLinkRef) {
+      this.#linkStyleList.delete(this.prePag?.styleLinkRef);
+    }
     this.prePage?.remove();
   }
 
@@ -145,7 +148,7 @@ class Inku {
         linkEl.id = filePath;
         linkEl.styleLinkRef = href;
         // 동일한 href의 스타일이 이미 추가되어 있는지 확인 (중복 방지)
-        if (!this.styleLinks.hasStyleLink(href)) {
+        if (!this.styleLinks.hasStyleLink(href) || this.styleLinks.prePage) {
           this.styleLinks.append(linkEl); // 링크 추가
 
           // 링크가 로딩될 때까지 기다림

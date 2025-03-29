@@ -77,6 +77,7 @@ class InkuStyle {
    * @param {HTMLElement} elem 
    */
   remove(elem) {
+    this.#linkStyleList.delete(elem.styleLinkRef);
     elem.remove();
   }
 

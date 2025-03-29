@@ -93,6 +93,8 @@ class InkuStyle {
 
   /** 이전 페이지 스타일 제거 */
   removePrePage() {
+    // console.log(this.prePag?.styleLinkRef)
+    // this.#linkStyleList.delete(this.prePag?.styleLinkRef);
     if(this.prePag?.styleLinkRef) {
       this.#linkStyleList.delete(this.prePag?.styleLinkRef);
     }
@@ -126,7 +128,23 @@ class Inku {
   async getContent(filePath) {
     return (await fetch(filePath)).text();
   }
-
+  /**
+   * include("path", key="value") 형식을 파싱해서 path와 파라미터 객체로 분리
+   * @param {string} argsString
+   * @returns {{filePath: string, args: Object}}
+   */
+  parseInclude(argsString) {
+    const [pathRaw, ...rest] = argsString.split(',');
+    const filePath = pathRaw.trim().replace(/^['"]|['"]$/g, '');
+    const args = {};
+    for (const part of rest) {
+      const [key, val] = part.split('=');
+      if (key && val) {
+        args[key.trim()] = val.trim().replace(/^['"]|['"]$/g, '');
+      }
+    }
+    return { filePath, args };
+  }
   /**
    * HTML에서 <link rel="stylesheet"> 요소를 추출하고 동적으로 스타일 추가
    * @param {string} html 
@@ -134,52 +152,64 @@ class Inku {
    * @returns {Promise<string>} 스타일 링크 제거된 HTML 반환
    */
   async extractStyles(html, filePath) {
+    // HTML 주석 제거 (주석 안에 있는 link 태그 무시되게 처리)
+    html = html.replace(/<!--[\s\S]*?-->/g, '');
+  
     const styleLinkRegex = /<link\s+rel=["']stylesheet["']\s+href=["'](.+?)["'].*?>/gi;
     const links = [...html.matchAll(styleLinkRegex)];
     const style = document.getElementById(filePath);
-
+  
     for (const match of links) {
       const href = match[1];
-
+  
       if (!style) {
         const linkEl = document.createElement('link');
         linkEl.rel = 'stylesheet';
         linkEl.href = href;
         linkEl.id = filePath;
         linkEl.styleLinkRef = href;
+  
         // 동일한 href의 스타일이 이미 추가되어 있는지 확인 (중복 방지)
         if (!this.styleLinks.hasStyleLink(href) || this.styleLinks.prePage) {
           this.styleLinks.append(linkEl); // 링크 추가
-
+  
           // 링크가 로딩될 때까지 기다림
           await new Promise(resolve => {
             if (linkEl.sheet) return resolve();
             linkEl.onload = () => resolve();
           });
-
+  
           // 이전 페이지 스타일 제거
           this.styleLinks.removePrePage();
         }
       }
-
+  
       html = html.replace(match[0], ''); // 원래 HTML에서 <link> 제거
     }
-
+  
     return html;
   }
+  
 
   /**
-   * HTML 내 include 템플릿 처리
+   * HTML 내 include 템플릿 처리 및 {{!변수}} 보간 처리
    * @param {string} html 
+   * @param {Object} context
    * @returns {Promise<string>}
    */
-  async resolveIncludes(html) {
-    const includeRegex = /{{\s*include\(["'](.+?)["']\)\s*}}/g;
+  async resolveIncludes(html, context = {}) {
+    const includeRegex = /{{\s*include\(([^)]+)\)\s*}}/g;
     const matches = [...html.matchAll(includeRegex)];
 
     for (const match of matches) {
-      const partialPath = match[1];
-      const partialHTML = await this.fetchAndResolve(partialPath);
+      const { filePath, args } = this.parseInclude(match[1]);
+      const subContext = { ...context, ...args };
+      let partialHTML = await this.fetchAndResolve(filePath, subContext);
+
+      for (const [key, val] of Object.entries(subContext)) {
+        partialHTML = partialHTML.replace(new RegExp(`{{!${key}}}`, 'g'), val);
+      }
+
       html = html.replace(match[0], partialHTML);
     }
 
@@ -189,13 +219,13 @@ class Inku {
   /**
    * 파일 내용을 가져오고 include와 스타일도 처리
    * @param {string} filePath 
+   * @param {Object} context
    * @returns {Promise<string>}
    */
-  async fetchAndResolve(filePath) {
+  async fetchAndResolve(filePath, context = {}) {
     let html = await this.getContent(filePath);
-    html = await this.resolveIncludes(html);
+    html = await this.resolveIncludes(html, context);
     html = await this.extractStyles(html, filePath);
-
     return html;
   }
 

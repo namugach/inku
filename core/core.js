@@ -172,6 +172,18 @@ class Inku {
   
     return { filePath, args };
   }
+  runInlineScripts(container) {
+    const scripts = container.querySelectorAll('script');
+    for (const oldScript of scripts) {
+      const newScript = document.createElement('script');
+      if (oldScript.src) {
+        newScript.src = oldScript.src;
+      } else {
+        newScript.textContent = oldScript.textContent;
+      }
+      oldScript.replaceWith(newScript);
+    }
+  }
   
   /**
    * HTML에서 <link rel="stylesheet"> 요소를 추출하고 동적으로 스타일 추가
@@ -280,6 +292,7 @@ class Inku {
     // 렌더링 완료 후 화면에 표시
     target.innerHTML = html;
     target.classList.add('visible');
+    this.runInlineScripts(target);
   }
 
   /** 현재 URL 해시로부터 뷰 이름을 얻음 */

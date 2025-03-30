@@ -93,8 +93,6 @@ class InkuStyle {
 
   /** 이전 페이지 스타일 제거 */
   removePrePage() {
-    // console.log(this.prePag?.styleLinkRef)
-    // this.#linkStyleList.delete(this.prePag?.styleLinkRef);
     if(this.prePag?.styleLinkRef) {
       this.#linkStyleList.delete(this.prePag?.styleLinkRef);
     }
@@ -129,7 +127,6 @@ class Inku {
     return (await fetch(filePath)).text();
   }
   splitArgs(argsString) {
-    console.log(argsString);
     const result = [];
     let current = '';
     let inQuote = false;
@@ -231,7 +228,6 @@ class Inku {
   async resolveIncludes(html, context = {}) {
     const includeRegex = /{{\s*include\(((?:"[^"]*"|'[^']*'|[^)])*)\)\s*}}/g;
     const matches = [...html.matchAll(includeRegex)];
-    console.log(matches);
 
     for (const match of matches) {
       const { filePath, args } = this.parseInclude(match[1]);

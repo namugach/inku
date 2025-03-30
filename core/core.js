@@ -128,23 +128,54 @@ class Inku {
   async getContent(filePath) {
     return (await fetch(filePath)).text();
   }
+  splitArgs(argsString) {
+    console.log(argsString);
+    const result = [];
+    let current = '';
+    let inQuote = false;
+    let quoteChar = '';
+  
+    for (let i = 0; i < argsString.length; i++) {
+      const char = argsString[i];
+  
+      if ((char === '"' || char === "'") && !inQuote) {
+        inQuote = true;
+        quoteChar = char;
+        current += char;
+      } else if (char === quoteChar && inQuote) {
+        inQuote = false;
+        current += char;
+      } else if (char === ',' && !inQuote) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    if (current) result.push(current.trim());
+    return result;
+  }
+  
   /**
    * include("path", key="value") 형식을 파싱해서 path와 파라미터 객체로 분리
    * @param {string} argsString
    * @returns {{filePath: string, args: Object}}
    */
   parseInclude(argsString) {
-    const [pathRaw, ...rest] = argsString.split(',');
-    const filePath = pathRaw.trim().replace(/^['"]|['"]$/g, '');
+    const tokens = this.splitArgs(argsString);
+    const filePath = tokens[0].replace(/^['"]|['"]$/g, '');
     const args = {};
-    for (const part of rest) {
-      const [key, val] = part.split('=');
-      if (key && val) {
-        args[key.trim()] = val.trim().replace(/^['"]|['"]$/g, '');
+  
+    for (let i = 1; i < tokens.length; i++) {
+      const [key, valRaw] = tokens[i].split('=');
+      if (key && valRaw !== undefined) {
+        args[key.trim()] = valRaw.trim().replace(/^['"]|['"]$/g, '');
       }
     }
+  
     return { filePath, args };
   }
+  
   /**
    * HTML에서 <link rel="stylesheet"> 요소를 추출하고 동적으로 스타일 추가
    * @param {string} html 
@@ -198,8 +229,9 @@ class Inku {
    * @returns {Promise<string>}
    */
   async resolveIncludes(html, context = {}) {
-    const includeRegex = /{{\s*include\(([^)]+)\)\s*}}/g;
+    const includeRegex = /{{\s*include\(((?:"[^"]*"|'[^']*'|[^)])*)\)\s*}}/g;
     const matches = [...html.matchAll(includeRegex)];
+    console.log(matches);
 
     for (const match of matches) {
       const { filePath, args } = this.parseInclude(match[1]);

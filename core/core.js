@@ -105,6 +105,138 @@ class InkuStyle {
   }
 }
 
+// InkuForParser: 중첩된 {{ for(...) }} ... {{ endfor }} 블록을 정확히 파싱하는 템플릿 파서
+/* 일단 이건 나중에 */
+class InkuForParser {
+  constructor(context = {}) {
+    this.context = context;
+  }
+
+  async parse(template) {
+    return await this.#resolveBlocks(template, this.context);
+  }
+
+  async #resolveBlocks(template, context) {
+    const tokens = this.#tokenize(template);
+    const output = await this.#processTokens(tokens, context);
+    return output;
+  }
+
+  #tokenize(template) {
+    const regex = /{{\s*(for\((.*?)\)|endfor|!\s*\w+)\s*}}/g;
+    const tokens = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(template)) !== null) {
+      if (match.index > lastIndex) {
+        const text = template.slice(lastIndex, match.index);
+        tokens.push({ type: 'text', value: text });
+      }
+
+      if (match[1].startsWith('for(')) {
+        tokens.push({ type: 'for_open', value: match[2].trim() });
+      } else if (match[1] === 'endfor') {
+        tokens.push({ type: 'for_close' });
+      } else if (match[1].startsWith('!')) {
+        tokens.push({ type: 'variable', value: match[1].slice(1).trim() });
+      }
+
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < template.length) {
+      tokens.push({ type: 'text', value: template.slice(lastIndex) });
+    }
+
+    return tokens;
+  }
+
+  async #processTokens(tokens, context) {
+    const stack = [];
+    const output = [];
+    let current = output;
+
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+
+      if (token.type === 'for_open') {
+        const [varName, iterableExpr] = token.value.split(' in ').map(s => s.trim());
+        const forBlock = { type: 'for', varName, iterableExpr, children: [] };
+        current.push(forBlock);
+        stack.push(current);
+        current = forBlock.children;
+      } else if (token.type === 'for_close') {
+        current = stack.pop();
+      } else {
+        current.push(token);
+      }
+    }
+
+    return await this.#renderTokens(output, context);
+  }
+
+  async #renderTokens(tokens, context) {
+    let result = '';
+
+    for (const token of tokens) {
+      if (token.type === 'text') {
+        const trimmed = token.value.replace(/^[ \n]+/gm, '');
+        console.log(1, token);
+        result += trimmed;
+      } else if (token.type === 'variable') {
+        result += context[token.value] ?? '';
+      } else if (token.type === 'for') {
+        const iterable = this.#evaluate(token.iterableExpr, context);
+
+        if (Array.isArray(iterable)) {
+          for (const item of iterable) {
+            const loopCtx = { ...context, [token.varName]: item };
+            result += await this.#renderTokens(token.children, loopCtx);
+          }
+        } else if (typeof iterable === 'number') {
+          for (let i = 0; i < iterable; i++) {
+            const loopCtx = { ...context, [token.varName]: i };
+            result += await this.#renderTokens(token.children, loopCtx);
+          }
+        }
+      }
+    }
+    console.log(result);
+
+    return result;
+  }
+
+  #evaluate(expr, context) {
+    try {
+      const keys = Object.keys(context);
+      const values = Object.values(context);
+      const fn = new Function(...keys, `return (${expr})`);
+      return fn(...values);
+    } catch {
+      return [];
+    }
+  }
+}
+
+// 사용 예시
+// (async function() {
+//   const parser = new InkuForParser({
+//     items: ['🍎', '🍌', '🍇']
+//   });
+  
+//   const html = await parser.parse(`
+//     <ul>
+//       {{ for(item in items) }}
+//        {{ for(item in items) }}
+//           <li>{{!item}}</li>
+//         {{ endfor }}
+//       {{ endfor }}
+//     </ul>
+//   `);
+//   // console.log(html);
+// })()
+
 
 /**
  * HTML을 로드하고 스타일을 관리하며 렌더링을 처리하는 클래스
@@ -115,6 +247,7 @@ class Inku {
    */
   constructor(inkuStyle) {
     this.styleLinks = inkuStyle;
+    // this.forParser = new InkuForParser();
     this.init(); // 라우팅 이벤트 등록
   }
 
@@ -166,12 +299,23 @@ class Inku {
     for (let i = 1; i < tokens.length; i++) {
       const [key, valRaw] = tokens[i].split('=');
       if (key && valRaw !== undefined) {
-        args[key.trim()] = valRaw.trim().replace(/^['"]|['"]$/g, '');
+        const rawVal = valRaw.trim();
+  
+        try {
+          // 진짜로 평가해서 배열/숫자/객체로 바꿈
+          const parsed = new Function(`return (${rawVal})`)();
+          args[key.trim()] = parsed;
+        } catch {
+          // 평가 실패하면 그냥 문자열로
+          args[key.trim()] = rawVal.replace(/^['"]|['"]$/g, '');
+        }
       }
     }
   
     return { filePath, args };
   }
+  
+  
   runInlineScripts(container, pageInfo) {
     const scripts = container.querySelectorAll('script');
   
@@ -258,6 +402,80 @@ class Inku {
       }
     }
   }
+ 
+  #resolveIfStatements(html, context) {
+    const result = html.replace(/{{\s*if\s*\((.*?)\)\s*}}([\s\S]*?){{\s*endif\s*}}/g, (_, condition, content) => {
+      try {
+        const fn = new Function(...Object.keys(context), `return (${condition});`);
+        const result = fn(...Object.values(context));
+        return result ? content : '';
+      } catch (e) {
+        console.warn('❌ if 처리 실패:', e);
+        return '';
+      }
+    });
+    return result;
+  }
+  
+  #resolveForStatements(html, context) {
+    const forPattern = /{{\s*for\s*\((\w+)\s+in\s+(.*?)\)\s*}}([\s\S]*?){{\s*endfor\s*}}/g;
+  
+    return html.replace(forPattern, (match, loopVarName, iterableExpr, loopContent) => {
+      try {
+        // 1. context로 표현식 평가
+        const keys = Object.keys(context);
+        const values = Object.values(context);
+        const fn = new Function(...keys, `return (${iterableExpr})`);
+        let result = fn(...values);
+  
+        // 🔥 2. 만약 문자열인데 배열처럼 생겼으면 강제로 파싱
+        if (typeof result === 'string' && /^\[.*\]$/.test(result.trim())) {
+          try {
+            result = new Function(`return (${result})`)();
+          } catch {
+            console.warn('❌ 문자열 평가 실패:', result);
+          }
+        }
+  
+        // 3. 반복 가능한 배열로 전환
+        let iterable = [];
+  
+        if (Array.isArray(result)) {
+          iterable = result;
+        } else if (typeof result === 'number') {
+          iterable = Array.from({ length: result }, (_, i) => i);
+        } else {
+          console.warn('❌ for: 반복 불가능한 값입니다.', result);
+          return '';
+        }
+  
+        // 4. 보간 처리
+        const output = [];
+  
+        for (const val of iterable) {
+          const replaced = loopContent.replace(
+            new RegExp(`{{\\s*!\\s*${loopVarName}\\s*}}`, 'g'),
+            val
+          );
+          output.push(replaced);
+        }
+  
+        return output.join('');
+      } catch (err) {
+        console.warn('❌ for 처리 중 오류:', err);
+        return '';
+      }
+    });
+  }
+  
+  
+  
+
+  async #resolveControlStatements(html, context = {}) {
+    html = await this.#resolveIfStatements(html, context);
+    html = await this.#resolveForStatements(html, context);
+    return html;
+  }
   
   /**
    * HTML 내 include 템플릿 처리 및 {{!변수}} 보간 처리
@@ -266,6 +484,7 @@ class Inku {
    * @returns {Promise<string>}
    */
   async resolveIncludes(html, context = {}) {
+    html = await this.#resolveControlStatements(html, context);
     const includeRegex = /{{\s*include\(((?:"[^"]*"|'[^']*'|[^)])*)\)\s*}}/g;
     const matches = [...html.matchAll(includeRegex)];
 

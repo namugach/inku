@@ -172,18 +172,24 @@ class Inku {
   
     return { filePath, args };
   }
-  runInlineScripts(container) {
+  runInlineScripts(container, pageInfo) {
     const scripts = container.querySelectorAll('script');
+    const className = `inKuScript:${pageInfo}`;
+    
     for (const oldScript of scripts) {
       const newScript = document.createElement('script');
+      newScript.className = className;
+  
       if (oldScript.src) {
         newScript.src = oldScript.src;
       } else {
-        newScript.textContent = oldScript.textContent;
+        newScript.textContent = `(() => {\n${oldScript.textContent}\n})();`;
       }
+  
       oldScript.replaceWith(newScript);
     }
   }
+  
   
   /**
    * HTML에서 <link rel="stylesheet"> 요소를 추출하고 동적으로 스타일 추가
@@ -274,10 +280,10 @@ class Inku {
    * @param {string} [viewName='home'] 
    */
   async render(viewName = 'home') {
+    const pageInfo = `pages/${viewName}/index.html`;
     const target = document.getElementById('app');
-
     // HTML 먼저 가져오기
-    const html = await this.fetchAndResolve(`pages/${viewName}/index.html`);
+    const html = await this.fetchAndResolve(pageInfo);
 
     // 모든 스타일이 로드될 때까지 기다리기
     await Promise.all(
@@ -292,7 +298,7 @@ class Inku {
     // 렌더링 완료 후 화면에 표시
     target.innerHTML = html;
     target.classList.add('visible');
-    this.runInlineScripts(target);
+    this.runInlineScripts(target, pageInfo);
   }
 
   /** 현재 URL 해시로부터 뷰 이름을 얻음 */
@@ -302,15 +308,15 @@ class Inku {
   }
 
   /** 현재 라우트에 따라 페이지 렌더링 */
-  async route() {
+  async route(e) {
     const viewName = this.getCurrentRoute();
     await this.render(viewName);
   }
 
   /** 라우팅 이벤트 리스너 등록 */
   init() {
-    window.addEventListener('DOMContentLoaded', () => this.route());
-    window.addEventListener('hashchange', () => this.route());
+    window.addEventListener('DOMContentLoaded', e => this.route(e));
+    window.addEventListener('hashchange', e => this.route(e));
   }
 }
 

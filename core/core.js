@@ -237,7 +237,7 @@ class Inku {
     return html;
   }
   
-  async extractScriptsAndReplaceInDOM(container) {
+  async extractScriptsAndReplaceInDOM(container, pageInfo) {
     const scripts = container.querySelectorAll('script[src]');
   
     for (const oldScript of scripts) {
@@ -247,6 +247,7 @@ class Inku {
         const scriptText = await response.text();
   
         const newScript = document.createElement('script');
+        newScript.className = `inkuScript:${pageInfo}`;
         newScript.textContent = `(() => {\n${scriptText}\n})();\n//# sourceURL=${src}`;
   
         // 기존 위치에 새 스크립트를 그대로 삽입
@@ -320,7 +321,7 @@ class Inku {
     target.innerHTML = html;
     target.classList.add('visible');
     this.runInlineScripts(target, pageInfo);
-    await this.extractScriptsAndReplaceInDOM(target);
+    await this.extractScriptsAndReplaceInDOM(target, pageInfo);
   }
 
   /** 현재 URL 해시로부터 뷰 이름을 얻음 */

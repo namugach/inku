@@ -174,21 +174,22 @@ class Inku {
   }
   runInlineScripts(container, pageInfo) {
     const scripts = container.querySelectorAll('script');
+  
     const className = `inKuScript:${pageInfo}`;
     
     for (const oldScript of scripts) {
+      // src 있는 건 무시 (extractScriptsAndReplaceInDOM에서 처리함)
+      if (oldScript.src) continue;
+  
       const newScript = document.createElement('script');
       newScript.className = className;
   
-      if (oldScript.src) {
-        newScript.src = oldScript.src;
-      } else {
-        newScript.textContent = `(() => {\n${oldScript.textContent}\n})();`;
-      }
+      newScript.textContent = `(() => {\n${oldScript.textContent}\n})();`;
   
       oldScript.replaceWith(newScript);
     }
   }
+  
   
   
   /**
@@ -236,7 +237,27 @@ class Inku {
     return html;
   }
   
-
+  async extractScriptsAndReplaceInDOM(container) {
+    const scripts = container.querySelectorAll('script[src]');
+  
+    for (const oldScript of scripts) {
+      const src = oldScript.getAttribute('src');
+      try {
+        const response = await fetch(src);
+        const scriptText = await response.text();
+  
+        const newScript = document.createElement('script');
+        newScript.textContent = `(() => {\n${scriptText}\n})();\n//# sourceURL=${src}`;
+  
+        // 기존 위치에 새 스크립트를 그대로 삽입
+        oldScript.replaceWith(newScript);
+  
+      } catch (e) {
+        console.warn(`❌ 스크립트 불러오기 실패: ${src}`, e);
+      }
+    }
+  }
+  
   /**
    * HTML 내 include 템플릿 처리 및 {{!변수}} 보간 처리
    * @param {string} html 
@@ -299,6 +320,7 @@ class Inku {
     target.innerHTML = html;
     target.classList.add('visible');
     this.runInlineScripts(target, pageInfo);
+    await this.extractScriptsAndReplaceInDOM(target);
   }
 
   /** 현재 URL 해시로부터 뷰 이름을 얻음 */

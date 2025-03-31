@@ -314,6 +314,27 @@ class Inku {
   
     return { filePath, args };
   }
+  removeInterpolationComment(html) {
+    return html.replace(/<!--\s*{{.+}}\s*-->/g, '');
+  }
+  parseContextDeclarations(html) {
+    const context = {};
+    const regex = /\{\{\s*\$(\w+)\s*=\s*(.*?)\s*\}\}/g;
+    let match;
+  
+    while ((match = regex.exec(html)) !== null) {
+      const [, key, rawValue] = match;
+  
+      try {
+        const value = new Function(`return (${rawValue})`)();
+        context[key] = value;
+      } catch {
+        context[key] = rawValue.replace(/^['"]|['"]$/g, '');
+      }
+    }
+  
+    return context;
+  }
   
   
   runInlineScripts(container, pageInfo) {
@@ -511,10 +532,22 @@ class Inku {
    */
   async fetchAndResolve(filePath, context = {}) {
     let html = await this.getContent(filePath);
-    html = await this.resolveIncludes(html, context);
+    html = this.removeInterpolationComment(html);
+
+    // 템플릿 내 변수 선언 먼저 파싱
+    const declaredContext = this.parseContextDeclarations(html);
+
+    // context 우선순위: 넘겨준 값 > 템플릿 기본값
+    const mergedContext = { ...declaredContext, ...context };
+
+    // 변수 선언 라인 제거 (출력에서 보이지 않게)
+    html = html.replace(/\{\{\s*\$\w+\s*=.*?\}\}/g, '');
+
+    html = await this.resolveIncludes(html, mergedContext);
     html = await this.extractStyles(html, filePath);
     return html;
   }
+
 
   /**
    * 실제로 HTML을 렌더링함

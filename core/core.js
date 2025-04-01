@@ -93,8 +93,8 @@ class InkuStyle {
 
   /** 이전 페이지 스타일 제거 */
   removePrePage() {
-    if(this.prePag?.styleLinkRef) {
-      this.#linkStyleList.delete(this.prePag?.styleLinkRef);
+    if(this.prePage?.styleLinkRef) {
+      this.#linkStyleList.delete(this.prePage?.styleLinkRef);
     }
     this.prePage?.remove();
   }

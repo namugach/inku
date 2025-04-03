@@ -1,0 +1,56 @@
+{{ include("parts/header.html") }}
+<main>
+  {{ $title = "Inku 예제 페이지" }}
+  {{ $items = ["🍎", "🍌", "🍇", "🍊", "🍓"] }}
+  {{ $user = { name: "홍길동", age: 25, isAdmin: true } }}
+
+  <div class="example-container">
+    <h1>{{!title}}</h1>
+
+    <section class="example-section">
+      <h2>1. 변수 보간 예제</h2>
+      <p>사용자 이름: {{!user.name}}</p>
+      <p>나이: {{!user.age}}세</p>
+    </section>
+
+    <section class="example-section">
+      <h2>2. 조건문 예제</h2>
+      {{ if(user.isAdmin) }}
+      <p class="admin-badge">관리자입니다!</p>
+      {{ endif }}
+
+      {{ if(user.age >= 20) }}
+      <p>성인입니다.</p>
+      {{ endif }}
+    </section>
+
+    <section class="example-section">
+      <h2>3. 반복문 예제</h2>
+      <ul class="fruit-list">
+        {{ for(item in items) }}
+        <li>{{!item}}</li>
+        {{ endfor }}
+      </ul>
+
+      <h3>중첩 반복문 예제</h3>
+      {{ for(i in 3) }}
+      <div class="nested-loop">
+        <h4>반복 {{!i + 1}}</h4>
+        <ul>
+          {{ for(item in items) }}
+          <li>{{!item}} (반복 {{!i + 1}})</li>
+          {{ endfor }}
+        </ul>
+      </div>
+      {{ endfor }}
+    </section>
+
+    <section class="example-section">
+      <h2>4. Include 예제</h2>
+      {{ include("parts/header.html", title="헤더 컴포넌트") }}
+      {{ include("parts/footer.html", year=2024) }}
+    </section>
+  </div>
+</main>
+
+{{ include("parts/footer.html") }}

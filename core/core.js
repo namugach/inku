@@ -112,7 +112,8 @@ class InkuForParser {
     this.context = context;
   }
 
-  async parse(template) {
+  async parse(template, context = {}) {
+    this.context = { ...this.context, ...context };  // context 병합
     return await this.#resolveBlocks(template, this.context);
   }
 
@@ -181,11 +182,10 @@ class InkuForParser {
 
     for (const token of tokens) {
       if (token.type === 'text') {
-        const trimmed = token.value.replace(/^[ \n]+/gm, '');
-        console.log(1, token);
-        result += trimmed;
+        result += token.value;
       } else if (token.type === 'variable') {
-        result += context[token.value] ?? '';
+        const value = this.#evaluate(token.value, context);
+        result += value ?? '';
       } else if (token.type === 'for') {
         const iterable = this.#evaluate(token.iterableExpr, context);
 
@@ -202,7 +202,6 @@ class InkuForParser {
         }
       }
     }
-    console.log(result);
 
     return result;
   }
@@ -213,8 +212,9 @@ class InkuForParser {
       const values = Object.values(context);
       const fn = new Function(...keys, `return (${expr})`);
       return fn(...values);
-    } catch {
-      return [];
+    } catch (e) {
+      console.warn('❌ 표현식 평가 실패:', expr, e);
+      return undefined;
     }
   }
 }
@@ -247,7 +247,7 @@ class Inku {
    */
   constructor(inkuStyle) {
     this.styleLinks = inkuStyle;
-    // this.forParser = new InkuForParser();
+    this.forParser = new InkuForParser();  // InkuForParser 활성화
     this.init(); // 라우팅 이벤트 등록
   }
 
@@ -493,8 +493,25 @@ class Inku {
   
 
   async #resolveControlStatements(html, context = {}) {
+    // if 문 처리
     html = await this.#resolveIfStatements(html, context);
-    html = await this.#resolveForStatements(html, context);
+
+    // 중첩 for 문 처리를 위해 InkuForParser 사용
+    html = await this.forParser.parse(html);
+
+    // 변수 보간 처리
+    html = html.replace(/\{\{\s*!([^}]+)\}\}/g, (_, expr) => {
+      try {
+        const keys = Object.keys(context);
+        const values = Object.values(context);
+        const fn = new Function(...keys, `return (${expr});`);
+        return fn(...values);
+      } catch (e) {
+        console.warn('❌ 변수 보간 실패:', e);
+        return '';
+      }
+    });
+
     return html;
   }
   

@@ -1,4 +1,4 @@
-{{ include("parts/header.html") }}
+{{ !include("parts/header.html") }}
 <main>
   {{ $title = "Inku 예제 페이지" }}
   {{ $items = ["🍎", "🍌", "🍇", "🍊", "🍓"] }}
@@ -47,10 +47,10 @@
 
     <section class="example-section">
       <h2>4. Include 예제</h2>
-      {{ include("parts/header.html", title="헤더 컴포넌트") }}
-      {{ include("parts/footer.html", year=2024) }}
+      {{ !include("parts/header.html", title="헤더 컴포넌트") }}
+      {{ !include("parts/footer.html", year=2024) }}
     </section>
   </div>
 </main>
 
-{{ include("parts/footer.html") }}
+{{ !include("parts/footer.html") }}

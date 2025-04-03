@@ -8,7 +8,7 @@ Inku는 정적 HTML 기반의 SPA 렌더링 프레임워크로, 컴포넌트 기
 
 - **Inku**: 페이지 HTML을 비동기로 로드하고 렌더링한다.
 - **InkuStyle**: 페이지 전환 시 필요한 스타일 `<link>`를 동적으로 로드/제거한다.
-- **템플릿 문법**: `{{?변수}}`, `{{ include(...) }}`, `{{ for(...) }}`, `{{ if(...) }}` 등.
+- **템플릿 문법**: `{{?변수}}`, `{{ !include(...) }}`, `{{ for(...) }}`, `{{ if(...) }}` 등.
 - **페이지 구조**: `pages/뷰이름/index.html` 파일이 기본 엔트리로 동작한다.
 
 ---
@@ -43,7 +43,7 @@ core/
 #### 3.2 include 문법
 
 ```html
-{{ include("parts/header.html", title="홈", isLogin=true) }}
+{{ !include("parts/header.html", title="홈", isLogin=true) }}
 ```
 - 지정한 파일을 로드 후 내부 변수 보간을 적용.
 - context 병합 우선순위: 직접 전달된 값 > 템플릿 내부 선언.

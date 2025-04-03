@@ -10,14 +10,14 @@ export const RegexPatterns = {
   comments: /<!--\s*{{.+}}\s*-->/g,
   allComments: /<!--[\s\S]*?-->/g,
   styleLink: /<link\s+rel=["']stylesheet["']\s+href=["'](.+?)["'].*?>/gi,
-  include: /{{\s*include\(((?:"[^"]*"|'[^']*'|[^)])*)\)\s*}}/g,
+  include: /{{\s*!include\s*\(\s*((?:"[^"]*"|'[^']*'|[^)])*)\s*\)\s*}}/g,
   variable: /\{\{\s*\?([^}]+)\}\}/g,
   contextDeclaration: /\{\{\s*\$(\w+)\s*=\s*(.*?)\s*\}\}/g,
 
   // TemplateParser.js
   forBlock: /{{\s*for\s*\((.*?)\)\s*}}([\s\S]*?){{\s*endfor\s*}}/g,
   ifBlock: /{{\s*if\s*\((.*?)\)\s*}}([\s\S]*?){{\s*endif\s*}}/g,
-  templateToken: /{{\s*(for\((.*?)\)|endfor|\?\s*\w+)\s*}}/g,
+  templateToken: /{{\s*(for\s*\((.*?)\)|endfor|!include\s*\(.*?\)|\?\s*[^}]*?)\s*}}/g,
   arrayDetection: /^\[.*\]$/,
   quoteStrip: /^['"]|['"]$/g,
 };

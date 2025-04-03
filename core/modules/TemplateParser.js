@@ -61,12 +61,20 @@ export class TemplateParser {
         tokens.push({ type: 'text', value: text });
       }
 
-      if (match[1].startsWith('for(')) {
-        tokens.push({ type: 'for_open', value: match[2].trim() });
-      } else if (match[1] === 'endfor') {
+      const token = match[1];
+      if (token.startsWith('for(')) {
+        // for 구문의 경우 match[2]가 있는지 확인 (반복 변수와 배열 표현식)
+        const forParamsMatch = /for\s*\((.*?)\)/.exec(token);
+        const forParams = forParamsMatch ? forParamsMatch[1] : '';
+        tokens.push({ type: 'for_open', value: forParams });
+      } else if (token === 'endfor') {
         tokens.push({ type: 'for_close' });
-      } else if (match[1].startsWith('?')) {
-        tokens.push({ type: 'variable', value: match[1].slice(1).trim() });
+      } else if (token.startsWith('!include')) {
+        // include는 다른 방식으로 처리하므로 text로 유지
+        tokens.push({ type: 'text', value: match[0] });
+      } else if (token.startsWith('?')) {
+        // 변수 토큰
+        tokens.push({ type: 'variable', value: token.slice(1).trim() });
       }
 
       lastIndex = regex.lastIndex;
@@ -95,13 +103,28 @@ export class TemplateParser {
       const token = tokens[i];
 
       if (token.type === 'for_open') {
-        const [varName, iterableExpr] = token.value.split(' in ').map(s => s.trim());
+        // 구문 분석: "변수 in 표현식" 형태로 분리
+        const forExpression = token.value;
+        const parts = forExpression.split(/\s+in\s+/);
+        
+        if (parts.length !== 2) {
+          console.warn('❌ for: 잘못된 형식입니다. "변수 in 배열"이어야 합니다.', forExpression);
+          continue;
+        }
+        
+        const varName = parts[0].trim();
+        const iterableExpr = parts[1].trim();
+        
         const forBlock = { type: 'for', varName, iterableExpr, children: [] };
         current.push(forBlock);
         stack.push(current);
         current = forBlock.children;
       } else if (token.type === 'for_close') {
-        current = stack.pop();
+        if (stack.length > 0) {
+          current = stack.pop();
+        } else {
+          console.warn('❌ endfor 태그에 해당하는 for 블록이 없습니다.');
+        }
       } else {
         current.push(token);
       }
@@ -193,8 +216,18 @@ export class TemplateParser {
    * @returns {string} 처리된 HTML
    */
   resolveForStatements(html, context) {
-    return html.replace(this.patterns.forBlock, (match, loopVarName, iterableExpr, loopContent) => {
+    return html.replace(this.patterns.forBlock, (match, loopExpr, loopContent) => {
       try {
+        // 예: "item in items" 형태 분리
+        const parts = loopExpr.split(/\s+in\s+/);
+        if (parts.length !== 2) {
+          console.warn('❌ for: 잘못된 형식입니다. "변수 in 배열"이어야 합니다.', loopExpr);
+          return '';
+        }
+
+        const loopVarName = parts[0].trim();
+        const iterableExpr = parts[1].trim();
+
         // 1. context로 표현식 평가
         const keys = Object.keys(context);
         const values = Object.values(context);

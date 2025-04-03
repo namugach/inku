@@ -1,3 +1,8 @@
+import { StyleManager } from './modules/StyleManager.js';
+import { TemplateParser } from './modules/TemplateParser.js';
+import { ScriptManager } from './modules/ScriptManager.js';
+import { Router } from './modules/Router.js';
+
 /**
  * 스타일 링크를 동적으로 관리하는 클래스
  */
@@ -243,125 +248,48 @@ class InkuForParser {
  */
 class Inku {
   /**
-   * @param {InkuStyle} inkuStyle - 스타일을 관리하는 인스턴스
+   * @param {Object} [options={}] 설정 옵션
+   * @param {string} [options.defaultRoute='home'] 기본 라우트
+   * @param {string} [options.scriptClassName='inkuScript'] 스크립트 클래스 이름
    */
-  constructor(inkuStyle) {
-    this.styleLinks = inkuStyle;
-    this.forParser = new InkuForParser();  // InkuForParser 활성화
-    this.init(); // 라우팅 이벤트 등록
+  constructor(options = {}) {
+    const { defaultRoute = 'home', scriptClassName = 'inkuScript' } = options;
+    
+    // 모듈 초기화
+    this.styleManager = new StyleManager();
+    this.templateParser = new TemplateParser();
+    this.scriptManager = new ScriptManager(scriptClassName);
+    
+    // 라우터 초기화 (렌더링 콜백 함수 전달)
+    this.router = new Router(this.render.bind(this), defaultRoute);
+    
+    // 초기화
+    this.router.init();
   }
 
   /**
-   * 파일 경로에서 HTML 내용을 가져옴
-   * @param {string} filePath 
-   * @returns {Promise<string>}
+   * 파일 경로에서 HTML 내용을 가져옵니다.
+   * @param {string} filePath 파일 경로
+   * @returns {Promise<string>} HTML 내용
    */
   async getContent(filePath) {
     return (await fetch(filePath)).text();
   }
-  splitArgs(argsString) {
-    const result = [];
-    let current = '';
-    let inQuote = false;
-    let quoteChar = '';
-  
-    for (let i = 0; i < argsString.length; i++) {
-      const char = argsString[i];
-  
-      if ((char === '"' || char === "'") && !inQuote) {
-        inQuote = true;
-        quoteChar = char;
-        current += char;
-      } else if (char === quoteChar && inQuote) {
-        inQuote = false;
-        current += char;
-      } else if (char === ',' && !inQuote) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    if (current) result.push(current.trim());
-    return result;
-  }
-  
+
   /**
-   * include("path", key="value") 형식을 파싱해서 path와 파라미터 객체로 분리
-   * @param {string} argsString
-   * @returns {{filePath: string, args: Object}}
+   * HTML 주석 내 보간식을 제거합니다.
+   * @param {string} html HTML 문자열
+   * @returns {string} 처리된 HTML
    */
-  parseInclude(argsString) {
-    const tokens = this.splitArgs(argsString);
-    const filePath = tokens[0].replace(/^['"]|['"]$/g, '');
-    const args = {};
-  
-    for (let i = 1; i < tokens.length; i++) {
-      const [key, valRaw] = tokens[i].split('=');
-      if (key && valRaw !== undefined) {
-        const rawVal = valRaw.trim();
-  
-        try {
-          // 진짜로 평가해서 배열/숫자/객체로 바꿈
-          const parsed = new Function(`return (${rawVal})`)();
-          args[key.trim()] = parsed;
-        } catch {
-          // 평가 실패하면 그냥 문자열로
-          args[key.trim()] = rawVal.replace(/^['"]|['"]$/g, '');
-        }
-      }
-    }
-  
-    return { filePath, args };
-  }
   removeInterpolationComment(html) {
     return html.replace(/<!--\s*{{.+}}\s*-->/g, '');
   }
-  parseContextDeclarations(html) {
-    const context = {};
-    const regex = /\{\{\s*\$(\w+)\s*=\s*(.*?)\s*\}\}/g;
-    let match;
-  
-    while ((match = regex.exec(html)) !== null) {
-      const [, key, rawValue] = match;
-  
-      try {
-        const value = new Function(`return (${rawValue})`)();
-        context[key] = value;
-      } catch {
-        context[key] = rawValue.replace(/^['"]|['"]$/g, '');
-      }
-    }
-  
-    return context;
-  }
-  
-  
-  runInlineScripts(container, pageInfo) {
-    const scripts = container.querySelectorAll('script');
-  
-    const className = `inKuScript:${pageInfo}`;
-    
-    for (const oldScript of scripts) {
-      // src 있는 건 무시 (extractScriptsAndReplaceInDOM에서 처리함)
-      if (oldScript.src) continue;
-  
-      const newScript = document.createElement('script');
-      newScript.className = className;
-  
-      newScript.textContent = `(() => {\n${oldScript.textContent}\n})();`;
-  
-      oldScript.replaceWith(newScript);
-    }
-  }
-  
-  
-  
+
   /**
-   * HTML에서 <link rel="stylesheet"> 요소를 추출하고 동적으로 스타일 추가
-   * @param {string} html 
-   * @param {string} filePath 
-   * @returns {Promise<string>} 스타일 링크 제거된 HTML 반환
+   * HTML에서 <link rel="stylesheet"> 요소를 추출하고 동적으로 스타일을 추가합니다.
+   * @param {string} html HTML 문자열
+   * @param {string} filePath 파일 경로
+   * @returns {Promise<string>} 스타일 링크가 제거된 HTML
    */
   async extractStyles(html, filePath) {
     // HTML 주석 제거 (주석 안에 있는 link 태그 무시되게 처리)
@@ -382,8 +310,8 @@ class Inku {
         linkEl.styleLinkRef = href;
   
         // 동일한 href의 스타일이 이미 추가되어 있는지 확인 (중복 방지)
-        if (!this.styleLinks.hasStyleLink(href) || this.styleLinks.prePage) {
-          this.styleLinks.append(linkEl); // 링크 추가
+        if (!this.styleManager.hasStyleLink(href) || this.styleManager.prePage) {
+          this.styleManager.append(linkEl); // 링크 추가
   
           // 링크가 로딩될 때까지 기다림
           await new Promise(resolve => {
@@ -392,7 +320,7 @@ class Inku {
           });
   
           // 이전 페이지 스타일 제거
-          this.styleLinks.removePrePage();
+          this.styleManager.removePrePage();
         }
       }
   
@@ -401,103 +329,46 @@ class Inku {
   
     return html;
   }
-  
-  async extractScriptsAndReplaceInDOM(container, pageInfo) {
-    const scripts = container.querySelectorAll('script[src]');
-  
-    for (const oldScript of scripts) {
-      const src = oldScript.getAttribute('src');
-      try {
-        const response = await fetch(src);
-        const scriptText = await response.text();
-  
-        const newScript = document.createElement('script');
-        newScript.className = `inkuScript:${pageInfo}`;
-        newScript.textContent = `(() => {\n${scriptText}\n})();\n//# sourceURL=${src}`;
-  
-        // 기존 위치에 새 스크립트를 그대로 삽입
-        oldScript.replaceWith(newScript);
-  
-      } catch (e) {
-        console.warn(`❌ 스크립트 불러오기 실패: ${src}`, e);
-      }
-    }
-  }
- 
-  #resolveIfStatements(html, context) {
-    const result = html.replace(/{{\s*if\s*\((.*?)\)\s*}}([\s\S]*?){{\s*endif\s*}}/g, (_, condition, content) => {
-      try {
-        const fn = new Function(...Object.keys(context), `return (${condition});`);
-        const result = fn(...Object.values(context));
-        return result ? content : '';
-      } catch (e) {
-        console.warn('❌ if 처리 실패:', e);
-        return '';
-      }
-    });
-    return result;
-  }
-  
-  #resolveForStatements(html, context) {
-    const forPattern = /{{\s*for\s*\((\w+)\s+in\s+(.*?)\)\s*}}([\s\S]*?){{\s*endfor\s*}}/g;
-  
-    return html.replace(forPattern, (match, loopVarName, iterableExpr, loopContent) => {
-      try {
-        // 1. context로 표현식 평가
-        const keys = Object.keys(context);
-        const values = Object.values(context);
-        const fn = new Function(...keys, `return (${iterableExpr})`);
-        let result = fn(...values);
-  
-        // 🔥 2. 만약 문자열인데 배열처럼 생겼으면 강제로 파싱
-        if (typeof result === 'string' && /^\[.*\]$/.test(result.trim())) {
-          try {
-            result = new Function(`return (${result})`)();
-          } catch {
-            console.warn('❌ 문자열 평가 실패:', result);
-          }
-        }
-  
-        // 3. 반복 가능한 배열로 전환
-        let iterable = [];
-  
-        if (Array.isArray(result)) {
-          iterable = result;
-        } else if (typeof result === 'number') {
-          iterable = Array.from({ length: result }, (_, i) => i);
-        } else {
-          console.warn('❌ for: 반복 불가능한 값입니다.', result);
-          return '';
-        }
-  
-        // 4. 보간 처리
-        const output = [];
-  
-        for (const val of iterable) {
-          const replaced = loopContent.replace(
-            new RegExp(`{{\\s*!\\s*${loopVarName}\\s*}}`, 'g'),
-            val
-          );
-          output.push(replaced);
-        }
-  
-        return output.join('');
-      } catch (err) {
-        console.warn('❌ for 처리 중 오류:', err);
-        return '';
-      }
-    });
-  }
-  
-  
-  
 
+  /**
+   * HTML 내 include 템플릿을 처리합니다.
+   * @param {string} html HTML 문자열
+   * @param {Object} context 컨텍스트 객체
+   * @returns {Promise<string>} 처리된 HTML
+   */
+  async resolveIncludes(html, context = {}) {
+    html = await this.#resolveControlStatements(html, context);
+    const includeRegex = /{{\s*include\(((?:"[^"]*"|'[^']*'|[^)])*)\)\s*}}/g;
+    const matches = [...html.matchAll(includeRegex)];
+
+    for (const match of matches) {
+      const { filePath, args } = this.templateParser.parseInclude(match[1]);
+      const subContext = { ...context, ...args };
+      let partialHTML = await this.fetchAndResolve(filePath, subContext);
+
+      for (const [key, val] of Object.entries(subContext)) {
+        partialHTML = partialHTML.replace(new RegExp(`{{!${key}}}`, 'g'), val);
+      }
+
+      html = html.replace(match[0], partialHTML);
+    }
+
+    return html;
+  }
+
+  /**
+   * 제어문(if, for 등)을 처리합니다.
+   * @private
+   * @param {string} html HTML 문자열
+   * @param {Object} context 컨텍스트 객체
+   * @returns {Promise<string>} 처리된 HTML
+   */
   async #resolveControlStatements(html, context = {}) {
     // if 문 처리
-    html = await this.#resolveIfStatements(html, context);
+    html = this.templateParser.resolveIfStatements(html, context);
 
-    // 중첩 for 문 처리를 위해 InkuForParser 사용
-    html = await this.forParser.parse(html);
+    // 중첩 for 문 처리를 위해 TemplateParser 사용
+    html = await this.templateParser.parse(html, context);
 
     // 변수 보간 처리
     html = html.replace(/\{\{\s*!([^}]+)\}\}/g, (_, expr) => {
@@ -514,45 +385,19 @@ class Inku {
 
     return html;
   }
-  
-  /**
-   * HTML 내 include 템플릿 처리 및 {{!변수}} 보간 처리
-   * @param {string} html 
-   * @param {Object} context
-   * @returns {Promise<string>}
-   */
-  async resolveIncludes(html, context = {}) {
-    html = await this.#resolveControlStatements(html, context);
-    const includeRegex = /{{\s*include\(((?:"[^"]*"|'[^']*'|[^)])*)\)\s*}}/g;
-    const matches = [...html.matchAll(includeRegex)];
-
-    for (const match of matches) {
-      const { filePath, args } = this.parseInclude(match[1]);
-      const subContext = { ...context, ...args };
-      let partialHTML = await this.fetchAndResolve(filePath, subContext);
-
-      for (const [key, val] of Object.entries(subContext)) {
-        partialHTML = partialHTML.replace(new RegExp(`{{!${key}}}`, 'g'), val);
-      }
-
-      html = html.replace(match[0], partialHTML);
-    }
-
-    return html;
-  }
 
   /**
-   * 파일 내용을 가져오고 include와 스타일도 처리
-   * @param {string} filePath 
-   * @param {Object} context
-   * @returns {Promise<string>}
+   * 파일 내용을 가져오고 include와 스타일도 처리합니다.
+   * @param {string} filePath 파일 경로
+   * @param {Object} context 컨텍스트 객체
+   * @returns {Promise<string>} 처리된 HTML
    */
   async fetchAndResolve(filePath, context = {}) {
     let html = await this.getContent(filePath);
     html = this.removeInterpolationComment(html);
 
     // 템플릿 내 변수 선언 먼저 파싱
-    const declaredContext = this.parseContextDeclarations(html);
+    const declaredContext = this.templateParser.parseContextDeclarations(html);
 
     // context 우선순위: 넘겨준 값 > 템플릿 기본값
     const mergedContext = { ...declaredContext, ...context };
@@ -565,20 +410,20 @@ class Inku {
     return html;
   }
 
-
   /**
-   * 실제로 HTML을 렌더링함
-   * @param {string} [viewName='home'] 
+   * HTML을 렌더링합니다.
+   * @param {string} [viewName='home'] 뷰 이름
    */
   async render(viewName = 'home') {
     const pageInfo = `pages/${viewName}/index.html`;
     const target = document.getElementById('app');
+    
     // HTML 먼저 가져오기
     const html = await this.fetchAndResolve(pageInfo);
 
     // 모든 스타일이 로드될 때까지 기다리기
     await Promise.all(
-      this.styleLinks.list
+      this.styleManager.list
         .filter(link => link.tagName === 'LINK' && link.rel === 'stylesheet')
         .map(link => new Promise(resolve => {
           if (link.sheet) return resolve();
@@ -589,29 +434,15 @@ class Inku {
     // 렌더링 완료 후 화면에 표시
     target.innerHTML = html;
     target.classList.add('visible');
-    this.runInlineScripts(target, pageInfo);
-    await this.extractScriptsAndReplaceInDOM(target, pageInfo);
-  }
-
-  /** 현재 URL 해시로부터 뷰 이름을 얻음 */
-  getCurrentRoute() {
-    const hash = location.hash || '#/home';
-    return hash.replace(/^#\//, '');
-  }
-
-  /** 현재 라우트에 따라 페이지 렌더링 */
-  async route(e) {
-    const viewName = this.getCurrentRoute();
-    await this.render(viewName);
-  }
-
-  /** 라우팅 이벤트 리스너 등록 */
-  init() {
-    window.addEventListener('DOMContentLoaded', e => this.route(e));
-    window.addEventListener('hashchange', e => this.route(e));
+    
+    // 스크립트 처리
+    this.scriptManager.runInlineScripts(target, pageInfo);
+    await this.scriptManager.extractScriptsAndReplaceInDOM(target, pageInfo);
   }
 }
 
 // 인스턴스 생성 및 초기화
-const inkuStyle = new InkuStyle();
-const inku = new Inku(inkuStyle);
+const inku = new Inku();
+
+// 전역 객체에 노출 (필요한 경우)
+window.inku = inku;

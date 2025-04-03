@@ -65,7 +65,7 @@ export class TemplateParser {
         tokens.push({ type: 'for_open', value: match[2].trim() });
       } else if (match[1] === 'endfor') {
         tokens.push({ type: 'for_close' });
-      } else if (match[1].startsWith('!')) {
+      } else if (match[1].startsWith('?')) {
         tokens.push({ type: 'variable', value: match[1].slice(1).trim() });
       }
 
@@ -227,7 +227,7 @@ export class TemplateParser {
   
         for (const val of iterable) {
           const replaced = loopContent.replace(
-            createRegExp(`{{\\s*!\\s*${loopVarName}\\s*}}`, 'g'),
+            createRegExp(`{{\\s*\\?\\s*${loopVarName}\\s*}}`, 'g'),
             val
           );
           output.push(replaced);

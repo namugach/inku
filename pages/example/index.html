@@ -5,12 +5,12 @@
   {{ $user = { name: "홍길동", age: 25, isAdmin: true } }}
 
   <div class="example-container">
-    <h1>{{!title}}</h1>
+    <h1>{{?title}}</h1>
 
     <section class="example-section">
       <h2>1. 변수 보간 예제</h2>
-      <p>사용자 이름: {{!user.name}}</p>
-      <p>나이: {{!user.age}}세</p>
+      <p>사용자 이름: {{?user.name}}</p>
+      <p>나이: {{?user.age}}세</p>
     </section>
 
     <section class="example-section">
@@ -28,17 +28,17 @@
       <h2>3. 반복문 예제</h2>
       <ul class="fruit-list">
         {{ for(item in items) }}
-        <li>{{!item}}</li>
+        <li>{{?item}}</li>
         {{ endfor }}
       </ul>
 
       <h3>중첩 반복문 예제</h3>
       {{ for(i in 3) }}
       <div class="nested-loop">
-        <h4>반복 {{!i + 1}}</h4>
+        <h4>반복 {{?i + 1}}</h4>
         <ul>
           {{ for(item in items) }}
-          <li>{{!item}} (반복 {{!i + 1}})</li>
+          <li>{{?item}} (반복 {{?i + 1}})</li>
           {{ endfor }}
         </ul>
       </div>

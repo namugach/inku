@@ -108,7 +108,7 @@ class Inku {
       let partialHTML = await this.fetchAndResolve(filePath, subContext);
 
       for (const [key, val] of Object.entries(subContext)) {
-        partialHTML = partialHTML.replace(createRegExp(`{{!${key}}}`, 'g'), val);
+        partialHTML = partialHTML.replace(createRegExp(`{{\\?${key}}}`, 'g'), val);
       }
 
       html = html.replace(match[0], partialHTML);

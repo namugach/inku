@@ -1,3 +1,5 @@
+import { RegexPatterns } from './RegexPatterns.js';
+
 /**
  * 라우팅을 관리하는 클래스
  */
@@ -17,7 +19,7 @@ export class Router {
    */
   getCurrentRoute() {
     const hash = location.hash || `#/${this.defaultRoute}`;
-    return hash.replace(/^#\//, '');
+    return hash.replace(RegexPatterns.hashStrip, '');
   }
 
   /**

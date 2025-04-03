@@ -2,6 +2,7 @@ import { StyleManager } from './modules/StyleManager.js';
 import { TemplateParser } from './modules/TemplateParser.js';
 import { ScriptManager } from './modules/ScriptManager.js';
 import { Router } from './modules/Router.js';
+import { RegexPatterns, createRegExp } from './modules/RegexPatterns.js';
 
 /**
  * HTML을 로드하고 스타일을 관리하며 렌더링을 처리하는 클래스
@@ -42,7 +43,7 @@ class Inku {
    * @returns {string} 처리된 HTML
    */
   removeInterpolationComment(html) {
-    return html.replace(/<!--\s*{{.+}}\s*-->/g, '');
+    return html.replace(RegexPatterns.comments, '');
   }
 
   /**
@@ -53,9 +54,9 @@ class Inku {
    */
   async extractStyles(html, filePath) {
     // HTML 주석 제거 (주석 안에 있는 link 태그 무시되게 처리)
-    html = html.replace(/<!--[\s\S]*?-->/g, '');
+    html = html.replace(RegexPatterns.allComments, '');
   
-    const styleLinkRegex = /<link\s+rel=["']stylesheet["']\s+href=["'](.+?)["'].*?>/gi;
+    const styleLinkRegex = RegexPatterns.styleLink;
     const links = [...html.matchAll(styleLinkRegex)];
     const style = document.getElementById(filePath);
   
@@ -98,7 +99,7 @@ class Inku {
    */
   async resolveIncludes(html, context = {}) {
     html = await this.#resolveControlStatements(html, context);
-    const includeRegex = /{{\s*include\(((?:"[^"]*"|'[^']*'|[^)])*)\)\s*}}/g;
+    const includeRegex = RegexPatterns.include;
     const matches = [...html.matchAll(includeRegex)];
 
     for (const match of matches) {
@@ -107,7 +108,7 @@ class Inku {
       let partialHTML = await this.fetchAndResolve(filePath, subContext);
 
       for (const [key, val] of Object.entries(subContext)) {
-        partialHTML = partialHTML.replace(new RegExp(`{{!${key}}}`, 'g'), val);
+        partialHTML = partialHTML.replace(createRegExp(`{{!${key}}}`, 'g'), val);
       }
 
       html = html.replace(match[0], partialHTML);
@@ -131,7 +132,7 @@ class Inku {
     html = await this.templateParser.parse(html, context);
 
     // 변수 보간 처리
-    html = html.replace(/\{\{\s*!([^}]+)\}\}/g, (_, expr) => {
+    html = html.replace(RegexPatterns.variable, (_, expr) => {
       try {
         const keys = Object.keys(context);
         const values = Object.values(context);
@@ -163,7 +164,7 @@ class Inku {
     const mergedContext = { ...declaredContext, ...context };
 
     // 변수 선언 라인 제거 (출력에서 보이지 않게)
-    html = html.replace(/\{\{\s*\$\w+\s*=.*?\}\}/g, '');
+    html = html.replace(RegexPatterns.contextDeclaration, '');
 
     html = await this.resolveIncludes(html, mergedContext);
     html = await this.extractStyles(html, filePath);

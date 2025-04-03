@@ -1,3 +1,5 @@
+import { RegexPatterns, createRegExp } from './RegexPatterns.js';
+
 /**
  * 템플릿 파싱 및 렌더링을 담당하는 클래스
  */
@@ -9,11 +11,11 @@ export class TemplateParser {
     this.context = context;
     // 정규식 패턴 캐싱
     this.patterns = {
-      forBlock: /{{\s*for\s*\((.*?)\)\s*}}([\s\S]*?){{\s*endfor\s*}}/g,
-      ifBlock: /{{\s*if\s*\((.*?)\)\s*}}([\s\S]*?){{\s*endif\s*}}/g,
-      variable: /{{\s*!([^}]+)\}\}/g,
-      include: /{{\s*include\(((?:"[^"]*"|'[^']*'|[^)])*)\)\s*}}/g,
-      contextDecl: /\{\{\s*\$(\w+)\s*=\s*(.*?)\s*\}\}/g
+      forBlock: RegexPatterns.forBlock,
+      ifBlock: RegexPatterns.ifBlock,
+      variable: RegexPatterns.variable,
+      include: RegexPatterns.include,
+      contextDecl: RegexPatterns.contextDeclaration
     };
   }
 
@@ -48,7 +50,7 @@ export class TemplateParser {
    * @returns {Array} 토큰 배열
    */
   #tokenize(template) {
-    const regex = /{{\s*(for\((.*?)\)|endfor|!\s*\w+)\s*}}/g;
+    const regex = RegexPatterns.templateToken;
     const tokens = [];
     let lastIndex = 0;
     let match;
@@ -200,7 +202,7 @@ export class TemplateParser {
         let result = fn(...values);
   
         // 2. 만약 문자열인데 배열처럼 생겼으면 강제로 파싱
-        if (typeof result === 'string' && /^\[.*\]$/.test(result.trim())) {
+        if (typeof result === 'string' && RegexPatterns.arrayDetection.test(result.trim())) {
           try {
             result = new Function(`return (${result})`)();
           } catch {
@@ -225,7 +227,7 @@ export class TemplateParser {
   
         for (const val of iterable) {
           const replaced = loopContent.replace(
-            new RegExp(`{{\\s*!\\s*${loopVarName}\\s*}}`, 'g'),
+            createRegExp(`{{\\s*!\\s*${loopVarName}\\s*}}`, 'g'),
             val
           );
           output.push(replaced);
@@ -249,13 +251,17 @@ export class TemplateParser {
     let match;
   
     while ((match = this.patterns.contextDecl.exec(html)) !== null) {
-      const [, key, rawValue] = match;
-  
-      try {
-        const value = new Function(`return (${rawValue})`)();
-        context[key] = value;
-      } catch {
-        context[key] = rawValue.replace(/^['"]|['"]$/g, '');
+      const [_, key, rawValue] = match;
+      
+      if (key && rawValue !== undefined) {
+        try {
+          // 값이 JavaScript 표현식일 경우 평가
+          const value = new Function(`return (${rawValue})`)();
+          context[key] = value;
+        } catch {
+          // 평가할 수 없으면 단순 문자열로 취급
+          context[key] = rawValue.replace(RegexPatterns.quoteStrip, '');
+        }
       }
     }
   
@@ -263,34 +269,36 @@ export class TemplateParser {
   }
 
   /**
-   * include 구문을 파싱합니다.
-   * @param {string} argsString include 인자 문자열
-   * @returns {{filePath: string, args: Object}} 파싱된 결과
+   * include 지시문 파싱
+   * @param {string} argsString 
+   * @returns {Object} 파싱된 인자 객체
    */
   parseInclude(argsString) {
     const tokens = this.#splitArgs(argsString);
-    const filePath = tokens[0].replace(/^['"]|['"]$/g, '');
+    const filePath = tokens[0].replace(RegexPatterns.quoteStrip, '');
     const args = {};
-  
-    for (let i = 1; i < tokens.length; i++) {
-      const [key, valRaw] = tokens[i].split('=');
-      if (key && valRaw !== undefined) {
-        const rawVal = valRaw.trim();
-  
+    
+    if (tokens.length > 1) {
+      for (let i = 1; i < tokens.length; i++) {
+        const argPair = tokens[i].split('=');
+        if (argPair.length !== 2) continue;
+        
+        const key = argPair[0].trim();
+        const rawVal = argPair[1].trim();
+        
         try {
           // 진짜로 평가해서 배열/숫자/객체로 바꿈
-          const parsed = new Function(`return (${rawVal})`)();
-          args[key.trim()] = parsed;
+          args[key] = new Function(`return (${rawVal})`)();
         } catch {
           // 평가 실패하면 그냥 문자열로
-          args[key.trim()] = rawVal.replace(/^['"]|['"]$/g, '');
+          args[key.trim()] = rawVal.replace(RegexPatterns.quoteStrip, '');
         }
       }
     }
-  
+    
     return { filePath, args };
   }
-
+  
   /**
    * 인자 문자열을 분리합니다.
    * @private
@@ -302,10 +310,10 @@ export class TemplateParser {
     let current = '';
     let inQuote = false;
     let quoteChar = '';
-  
+    
     for (let i = 0; i < argsString.length; i++) {
       const char = argsString[i];
-  
+      
       if ((char === '"' || char === "'") && !inQuote) {
         inQuote = true;
         quoteChar = char;
